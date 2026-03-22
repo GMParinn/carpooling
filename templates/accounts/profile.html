@@ -1,0 +1,100 @@
+{% extends 'base.html' %}
+{% block title %}Profile — CarPoolNet{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="fw-bold mb-0"><i class="bi bi-person-circle me-2 text-primary"></i>My Profile</h2>
+</div>
+
+<div class="row g-4">
+  <div class="col-md-4">
+    <div class="card p-4 text-center">
+      <div class="bg-primary text-white rounded-circle d-inline-flex align-items-center justify-content-center mx-auto mb-3"
+           style="width:80px;height:80px;font-size:2rem">
+        {{ user.username|first|upper }}
+      </div>
+      <h4 class="fw-bold">{{ user.get_full_name|default:user.username }}</h4>
+      <p class="text-muted">@{{ user.username }}</p>
+      <span class="badge bg-primary">{{ user.get_role_display }}</span>
+      {% if user.email %}<p class="text-muted small mt-2">{{ user.email }}</p>{% endif %}
+    </div>
+
+    {% if user.is_passenger %}
+    <div class="card mt-3">
+      <div class="card-body">
+        <h6 class="card-title fw-bold"><i class="bi bi-wallet2 me-2 text-success"></i>Wallet</h6>
+        <div class="d-flex justify-content-between align-items-center">
+          <span class="text-muted">Balance</span>
+          <span class="fare-badge">${{ user.wallet_balance }}</span>
+        </div>
+        <a href="{% url 'accounts:topup' %}" class="btn btn-success btn-sm w-100 mt-3">
+          <i class="bi bi-plus-circle me-1"></i> Top Up
+        </a>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if user.is_driver %}
+    <div class="card mt-3">
+      <div class="card-body">
+        <h6 class="card-title fw-bold"><i class="bi bi-cash-stack me-2 text-success"></i>Earnings</h6>
+        <div class="d-flex justify-content-between">
+          <span class="text-muted">Wallet</span>
+          <span class="fare-badge">${{ user.wallet_balance }}</span>
+        </div>
+        <div class="d-flex justify-content-between mt-1">
+          <span class="text-muted">Total Earned</span>
+          <span class="text-muted fw-bold">${{ user.total_earnings }}</span>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="col-md-8">
+    <div class="card">
+      <div class="card-header d-flex align-items-center gap-2">
+        <i class="bi bi-clock-history text-primary"></i> Transaction History
+      </div>
+      <div class="card-body p-0">
+        {% if transactions %}
+        <table class="table table-hover mb-0">
+          <thead>
+            <tr>
+              <th>Type</th>
+              <th>Amount</th>
+              <th>Description</th>
+              <th>Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for tx in transactions %}
+            <tr>
+              <td>
+                {% if tx.transaction_type == 'topup' %}
+                  <span class="badge bg-success">Top-up</span>
+                {% elif tx.transaction_type == 'fare_deduction' %}
+                  <span class="badge bg-danger">Fare</span>
+                {% else %}
+                  <span class="badge bg-primary">Earning</span>
+                {% endif %}
+              </td>
+              <td class="fw-semibold {% if tx.transaction_type == 'fare_deduction' %}text-danger{% else %}text-success{% endif %}">
+                {% if tx.transaction_type == 'fare_deduction' %}-{% else %}+{% endif %}${{ tx.amount }}
+              </td>
+              <td class="text-muted small">{{ tx.description }}</td>
+              <td class="text-muted small">{{ tx.created_at|date:"M d, H:i" }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="text-center py-5 text-muted">
+          <i class="bi bi-receipt hero-icon d-block mb-2"></i>No transactions yet.
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

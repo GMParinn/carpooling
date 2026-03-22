@@ -1,0 +1,104 @@
+{% extends 'base.html' %}
+{% block title %}Driver Dashboard — CarPoolNet{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="fw-bold mb-0"><i class="bi bi-speedometer2 me-2 text-primary"></i>Driver Dashboard</h2>
+  <a href="{% url 'trips:create_trip' %}" class="btn btn-primary">
+    <i class="bi bi-plus-lg me-2"></i>New Trip
+  </a>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-sm-4">
+    <div class="card stat-card">
+      <div class="value">{{ active_trips|length }}</div>
+      <div class="label">Active Trips</div>
+    </div>
+  </div>
+  <div class="col-sm-4">
+    <div class="card stat-card">
+      <div class="value text-success">${{ request.user.wallet_balance }}</div>
+      <div class="label">Wallet Balance</div>
+    </div>
+  </div>
+  <div class="col-sm-4">
+    <div class="card stat-card">
+      <div class="value">${{ request.user.total_earnings }}</div>
+      <div class="label">Total Earned</div>
+    </div>
+  </div>
+</div>
+
+{% if active_trips %}
+<h5 class="fw-bold mb-3">Active & Pending Trips</h5>
+<div class="row g-3 mb-4">
+  {% for trip in active_trips %}
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start mb-3">
+          <div>
+            <h6 class="fw-bold mb-0">{{ trip.start_node }} → {{ trip.end_node }}</h6>
+            <small class="text-muted">{{ trip.created_at|date:"M d, Y H:i" }}</small>
+          </div>
+          <span class="badge badge-{{ trip.status }}">{{ trip.get_status_display }}</span>
+        </div>
+
+        <!-- Route preview -->
+        <div class="mb-3">
+          {% for rn in trip.route_nodes.all %}
+            <span class="badge {% if rn.visited %}bg-success{% elif trip.current_node == rn.node %}bg-primary{% else %}bg-light text-dark{% endif %} me-1">
+              {{ rn.node.name }}
+            </span>
+            {% if not forloop.last %}<i class="bi bi-arrow-right text-muted" style="font-size:.7rem"></i>{% endif %}
+          {% endfor %}
+        </div>
+
+        <div class="d-flex gap-2 flex-wrap">
+          <a href="{% url 'trips:trip_detail_driver' trip.id %}" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-eye me-1"></i>Details
+          </a>
+          <a href="{% url 'trips:driver_incoming_requests' trip.id %}" class="btn btn-outline-success btn-sm">
+            <i class="bi bi-people me-1"></i>Requests
+            {% with count=trip.carpool_requests.count %}
+              {% if count > 0 %}<span class="badge bg-success ms-1">{{ count }}</span>{% endif %}
+            {% endwith %}
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card text-center py-5">
+  <div class="text-muted">
+    <i class="bi bi-car-front hero-icon d-block mb-3"></i>
+    <h5>No active trips</h5>
+    <p>Start a new trip to begin accepting passengers.</p>
+    <a href="{% url 'trips:create_trip' %}" class="btn btn-primary">
+      <i class="bi bi-plus me-1"></i>Create Trip
+    </a>
+  </div>
+</div>
+{% endif %}
+
+{% if past_trips %}
+<h5 class="fw-bold mb-3 mt-4">Recent History</h5>
+<div class="card">
+  <table class="table table-hover mb-0">
+    <thead><tr><th>Route</th><th>Status</th><th>Date</th></tr></thead>
+    <tbody>
+      {% for trip in past_trips %}
+      <tr>
+        <td><strong>{{ trip.start_node }}</strong> → <strong>{{ trip.end_node }}</strong></td>
+        <td><span class="badge badge-{{ trip.status }}">{{ trip.get_status_display }}</span></td>
+        <td class="text-muted small">{{ trip.created_at|date:"M d, Y" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}

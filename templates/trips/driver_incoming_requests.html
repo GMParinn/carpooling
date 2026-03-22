@@ -1,0 +1,145 @@
+{% extends 'base.html' %}
+{% block title %}Incoming Requests — CarPoolNet{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h2 class="fw-bold mb-0">
+      <i class="bi bi-people me-2 text-primary"></i>Incoming Requests
+    </h2>
+    <small class="text-muted">
+      Trip #{{ trip.id }}: {{ trip.start_node }} → {{ trip.end_node }} ·
+      <span class="badge badge-{{ trip.status }}">{{ trip.get_status_display }}</span>
+    </small>
+  </div>
+  <a href="{% url 'trips:trip_detail_driver' trip.id %}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left me-1"></i>Back to Trip
+  </a>
+</div>
+
+<!-- Trip Capacity Bar -->
+{% with confirmed=trip.carpool_requests.count %}
+<div class="card mb-4">
+  <div class="card-body py-3">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <span class="fw-semibold">Passenger Capacity</span>
+      <span class="text-muted">{{ confirmed }} / {{ trip.max_passengers }} filled</span>
+    </div>
+    <div class="progress" style="height:8px">
+      <div class="progress-bar bg-success" style="width:{% widthratio confirmed trip.max_passengers 100 %}%"></div>
+    </div>
+  </div>
+</div>
+{% endwith %}
+
+{% if request_details %}
+<div class="row g-3">
+  {% for detail in request_details %}
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span class="fw-semibold">
+          <i class="bi bi-person-circle me-2 text-primary"></i>
+          {{ detail.request.passenger.get_full_name|default:detail.request.passenger.username }}
+        </span>
+        <span class="text-muted small">#{{ detail.request.id }}</span>
+      </div>
+      <div class="card-body">
+        <!-- Route info -->
+        <div class="d-flex align-items-center gap-2 mb-3">
+          <div class="text-center">
+            <div class="badge bg-info text-dark px-2 py-1">{{ detail.request.pickup_node }}</div>
+            <div class="text-muted small mt-1">Pickup</div>
+          </div>
+          <i class="bi bi-arrow-right text-muted fs-5 flex-shrink-0"></i>
+          <div class="text-center">
+            <div class="badge bg-warning text-dark px-2 py-1">{{ detail.request.dropoff_node }}</div>
+            <div class="text-muted small mt-1">Dropoff</div>
+          </div>
+        </div>
+
+        <!-- Fare & Detour -->
+        <div class="row g-2 mb-3">
+          <div class="col-6">
+            <div class="bg-light rounded p-2 text-center">
+              <div class="fare-badge">${{ detail.fare }}</div>
+              <div class="text-muted small">Fare</div>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="bg-light rounded p-2 text-center">
+              <div class="fw-bold fs-5 {% if detail.detour == 0 %}text-success{% elif detail.detour <= 2 %}text-warning{% else %}text-danger{% endif %}">
+                +{{ detail.detour }}
+              </div>
+              <div class="text-muted small">Extra Nodes</div>
+            </div>
+          </div>
+        </div>
+
+        {% if detail.detour == 0 %}
+        <div class="alert alert-success py-1 mb-3 small">
+          <i class="bi bi-star-fill me-1"></i>No detour — passenger is on your route!
+        </div>
+        {% elif detail.detour <= 2 %}
+        <div class="alert alert-warning py-1 mb-3 small">
+          <i class="bi bi-exclamation-triangle me-1"></i>Minor detour of {{ detail.detour }} node(s).
+        </div>
+        {% else %}
+        <div class="alert alert-secondary py-1 mb-3 small">
+          <i class="bi bi-info-circle me-1"></i>Detour of {{ detail.detour }} node(s).
+        </div>
+        {% endif %}
+
+        <!-- Make Offer Button -->
+        {% if trip.has_capacity %}
+        <form method="post" action="{% url 'trips:make_offer' trip.id detail.request.id %}">
+          {% csrf_token %}
+          <button class="btn btn-primary w-100">
+            <i class="bi bi-send me-1"></i>Send Offer — ${{ detail.fare }}
+          </button>
+        </form>
+        {% else %}
+        <button class="btn btn-secondary w-100" disabled>
+          <i class="bi bi-person-x me-1"></i>Trip Full
+        </button>
+        {% endif %}
+
+        <div class="text-muted small mt-2">
+          Requested {{ detail.request.created_at|timesince }} ago
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{% else %}
+<div class="card text-center py-5">
+  <div class="text-muted">
+    <i class="bi bi-inbox hero-icon d-block mb-3"></i>
+    <h5>No eligible requests right now</h5>
+    <p class="mb-0">Passengers whose pickup and dropoff are within 2 nodes of your route will appear here.</p>
+  </div>
+</div>
+{% endif %}
+
+<!-- Auto-refresh for live updates -->
+<div class="mt-4 d-flex justify-content-between align-items-center">
+  <span class="text-muted small" id="refresh-timer">Auto-refreshing in <span id="countdown">30</span>s</span>
+  <button class="btn btn-outline-secondary btn-sm" onclick="location.reload()">
+    <i class="bi bi-arrow-clockwise me-1"></i>Refresh Now
+  </button>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let secs = 30;
+const countdown = document.getElementById('countdown');
+setInterval(() => {
+  secs--;
+  countdown.textContent = secs;
+  if (secs <= 0) location.reload();
+}, 1000);
+</script>
+{% endblock %}

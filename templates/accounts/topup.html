@@ -1,0 +1,43 @@
+{% extends 'base.html' %}
+{% block title %}Top Up Wallet — CarPoolNet{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center mt-3">
+  <div class="col-md-5">
+    <div class="card p-4">
+      <h4 class="fw-bold mb-1"><i class="bi bi-wallet2 me-2 text-success"></i>Top Up Wallet</h4>
+      <p class="text-muted mb-4">Current balance: <strong class="text-success">${{ user.wallet_balance }}</strong></p>
+      <form method="post">
+        {% csrf_token %}
+        <div class="mb-3">
+          <label class="form-label fw-semibold">Amount (USD)</label>
+          {{ form.amount }}
+          {% if form.amount.errors %}
+            <div class="invalid-feedback d-block">{{ form.amount.errors }}</div>
+          {% endif %}
+        </div>
+        <div class="d-grid gap-2 d-flex">
+          {% for amount in "10,25,50,100"|split:"," %}
+          <button type="button" class="btn btn-outline-primary btn-sm flex-fill quick-amount"
+                  data-amount="{{ amount }}">+${{ amount }}</button>
+          {% endfor %}
+        </div>
+        <button class="btn btn-success w-100 mt-4" type="submit">
+          <i class="bi bi-plus-circle me-2"></i>Add Funds
+        </button>
+      </form>
+    </div>
+    <a href="{% url 'accounts:profile' %}" class="btn btn-link mt-2">← Back to Profile</a>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.querySelectorAll('.quick-amount').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelector('#id_amount').value = btn.dataset.amount;
+  });
+});
+</script>
+{% endblock %}

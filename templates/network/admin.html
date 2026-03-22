@@ -1,0 +1,254 @@
+{% extends 'base.html' %}
+{% block title %}Network Admin — CarPoolNet{% endblock %}
+
+{% block extra_head %}
+<style>
+  #graph-canvas { border: 1px solid #e2e8f0; border-radius: 12px; background: #fff; }
+  .node-circle { cursor: pointer; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="fw-bold mb-0"><i class="bi bi-diagram-3 me-2 text-primary"></i>Road Network</h2>
+  <div class="d-flex gap-2">
+    <span class="badge {% if service.enabled %}bg-success{% else %}bg-danger{% endif %} fs-6 px-3 py-2">
+      Service: {{ service.enabled|yesno:"Enabled,Disabled" }}
+    </span>
+    <form method="post" action="{% url 'network:toggle_service' %}">
+      {% csrf_token %}
+      <button class="btn btn-{% if service.enabled %}warning{% else %}success{% endif %} btn-sm">
+        <i class="bi bi-{% if service.enabled %}pause-circle{% else %}play-circle{% endif %} me-1"></i>
+        {{ service.enabled|yesno:"Suspend,Enable" }} Service
+      </button>
+    </form>
+  </div>
+</div>
+
+<div class="row g-4">
+  <!-- Graph Visualization -->
+  <div class="col-lg-8">
+    <div class="card">
+      <div class="card-header"><i class="bi bi-map me-2"></i>Network Graph</div>
+      <div class="card-body p-2">
+        <canvas id="graph-canvas" width="700" height="420"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Node & Edge -->
+  <div class="col-lg-4">
+    <div class="card mb-3">
+      <div class="card-header"><i class="bi bi-geo-alt me-2 text-primary"></i>Add Node</div>
+      <div class="card-body">
+        <form method="post" action="{% url 'network:add_node' %}">
+          {% csrf_token %}
+          <div class="mb-2">
+            <input type="text" name="name" class="form-control form-control-sm" placeholder="Node name *" required>
+          </div>
+          <div class="mb-2">
+            <input type="text" name="description" class="form-control form-control-sm" placeholder="Description">
+          </div>
+          <div class="row g-2 mb-2">
+            <div class="col">
+              <input type="number" step="any" name="latitude" class="form-control form-control-sm" placeholder="Latitude">
+            </div>
+            <div class="col">
+              <input type="number" step="any" name="longitude" class="form-control form-control-sm" placeholder="Longitude">
+            </div>
+          </div>
+          <button class="btn btn-primary btn-sm w-100">
+            <i class="bi bi-plus me-1"></i>Add Node
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-header"><i class="bi bi-arrow-right-circle me-2 text-success"></i>Add Edge</div>
+      <div class="card-body">
+        <form method="post" action="{% url 'network:add_edge' %}">
+          {% csrf_token %}
+          <div class="mb-2">
+            <select name="from_node" class="form-select form-select-sm" required>
+              <option value="">From Node...</option>
+              {% for node in nodes %}
+                <option value="{{ node.id }}">{{ node.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-2">
+            <select name="to_node" class="form-select form-select-sm" required>
+              <option value="">To Node...</option>
+              {% for node in nodes %}
+                <option value="{{ node.id }}">{{ node.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <button class="btn btn-success btn-sm w-100">
+            <i class="bi bi-plus me-1"></i>Add Edge
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Nodes Table -->
+  <div class="col-lg-6">
+    <div class="card">
+      <div class="card-header"><i class="bi bi-geo-alt-fill me-2 text-primary"></i>Nodes ({{ nodes|length }})</div>
+      <div class="card-body p-0">
+        {% if nodes %}
+        <table class="table table-hover table-sm mb-0">
+          <thead><tr><th>Name</th><th>Description</th><th>Coords</th><th></th></tr></thead>
+          <tbody>
+            {% for node in nodes %}
+            <tr>
+              <td class="fw-semibold">{{ node.name }}</td>
+              <td class="text-muted small">{{ node.description|truncatechars:30 }}</td>
+              <td class="text-muted small">
+                {% if node.latitude %}{{ node.latitude|floatformat:2 }}, {{ node.longitude|floatformat:2 }}{% else %}—{% endif %}
+              </td>
+              <td>
+                <form method="post" action="{% url 'network:remove_node' node.id %}"
+                      onsubmit="return confirm('Remove node {{ node.name }}?')">
+                  {% csrf_token %}
+                  <button class="btn btn-danger btn-sm py-0 px-2">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="text-center py-4 text-muted">No nodes yet. Add one above.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Edges Table -->
+  <div class="col-lg-6">
+    <div class="card">
+      <div class="card-header"><i class="bi bi-arrow-right-circle-fill me-2 text-success"></i>Edges ({{ edges|length }})</div>
+      <div class="card-body p-0">
+        {% if edges %}
+        <table class="table table-hover table-sm mb-0">
+          <thead><tr><th>From</th><th></th><th>To</th><th></th></tr></thead>
+          <tbody>
+            {% for edge in edges %}
+            <tr>
+              <td class="fw-semibold">{{ edge.from_node.name }}</td>
+              <td><i class="bi bi-arrow-right text-muted"></i></td>
+              <td class="fw-semibold">{{ edge.to_node.name }}</td>
+              <td>
+                <form method="post" action="{% url 'network:remove_edge' edge.id %}"
+                      onsubmit="return confirm('Remove this edge?')">
+                  {% csrf_token %}
+                  <button class="btn btn-danger btn-sm py-0 px-2"><i class="bi bi-trash"></i></button>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <div class="text-center py-4 text-muted">No edges yet. Add one above.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(async () => {
+  const canvas = document.getElementById('graph-canvas');
+  const ctx = canvas.getContext('2d');
+  let data;
+  try {
+    const res = await fetch('/network/graph.json');
+    data = await res.json();
+  } catch(e) { return; }
+
+  const nodes = data.nodes;
+  const edges = data.edges;
+  if (!nodes.length) {
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '16px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('No nodes yet. Add nodes to see the graph.', canvas.width/2, canvas.height/2);
+    return;
+  }
+
+  // Layout: use lat/lng if available, else circular
+  const W = canvas.width, H = canvas.height;
+  const pad = 60;
+  const positions = {};
+
+  const hasCoords = nodes.every(n => n.latitude && n.longitude);
+  if (hasCoords) {
+    const lats = nodes.map(n => n.latitude), lngs = nodes.map(n => n.longitude);
+    const minLat = Math.min(...lats), maxLat = Math.max(...lats);
+    const minLng = Math.min(...lngs), maxLng = Math.max(...lngs);
+    nodes.forEach(n => {
+      positions[n.id] = {
+        x: pad + (n.longitude - minLng) / (maxLng - minLng + 0.0001) * (W - 2*pad),
+        y: H - pad - (n.latitude - minLat) / (maxLat - minLat + 0.0001) * (H - 2*pad),
+        name: n.name
+      };
+    });
+  } else {
+    const cx = W/2, cy = H/2, r = Math.min(W, H)/2 - pad;
+    nodes.forEach((n, i) => {
+      const angle = (2 * Math.PI * i / nodes.length) - Math.PI/2;
+      positions[n.id] = { x: cx + r * Math.cos(angle), y: cy + r * Math.sin(angle), name: n.name };
+    });
+  }
+
+  // Draw edges with arrows
+  ctx.strokeStyle = '#94a3b8';
+  ctx.lineWidth = 2;
+  edges.forEach(e => {
+    const from = positions[e.from_node_id], to = positions[e.to_node_id];
+    if (!from || !to) return;
+    const dx = to.x - from.x, dy = to.y - from.y;
+    const len = Math.sqrt(dx*dx + dy*dy);
+    const ux = dx/len, uy = dy/len;
+    const startX = from.x + ux*14, startY = from.y + uy*14;
+    const endX = to.x - ux*18, endY = to.y - uy*18;
+    ctx.beginPath();
+    ctx.moveTo(startX, startY);
+    ctx.lineTo(endX, endY);
+    ctx.stroke();
+    // Arrow head
+    const headLen = 10, angle = Math.atan2(dy, dx);
+    ctx.beginPath();
+    ctx.moveTo(endX, endY);
+    ctx.lineTo(endX - headLen * Math.cos(angle - 0.4), endY - headLen * Math.sin(angle - 0.4));
+    ctx.lineTo(endX - headLen * Math.cos(angle + 0.4), endY - headLen * Math.sin(angle + 0.4));
+    ctx.closePath();
+    ctx.fillStyle = '#94a3b8';
+    ctx.fill();
+  });
+
+  // Draw nodes
+  Object.entries(positions).forEach(([id, pos]) => {
+    ctx.beginPath();
+    ctx.arc(pos.x, pos.y, 14, 0, Math.PI*2);
+    ctx.fillStyle = '#2563eb';
+    ctx.fill();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.fillStyle = '#1e293b';
+    ctx.font = 'bold 11px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(pos.name, pos.x, pos.y + 26);
+  });
+})();
+</script>
+{% endblock %}

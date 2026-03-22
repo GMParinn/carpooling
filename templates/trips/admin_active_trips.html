@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+{% block title %}Live Trips — Admin{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="fw-bold mb-0"><i class="bi bi-map me-2 text-primary"></i>Live Trips</h2>
+  <span class="badge bg-success fs-6 px-3 py-2">{{ trips|length }} Active</span>
+</div>
+
+{% if trips %}
+<div class="row g-3">
+  {% for trip in trips %}
+  <div class="col-md-6 col-lg-4">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span class="fw-semibold">
+          <i class="bi bi-person-circle me-1 text-primary"></i>
+          {{ trip.driver.get_full_name|default:trip.driver.username }}
+        </span>
+        <span class="badge badge-{{ trip.status }}">{{ trip.get_status_display }}</span>
+      </div>
+      <div class="card-body">
+        <div class="mb-2">
+          <strong>{{ trip.start_node }}</strong>
+          <i class="bi bi-arrow-right text-muted mx-1"></i>
+          <strong>{{ trip.end_node }}</strong>
+        </div>
+        {% if trip.current_node %}
+        <div class="text-muted small mb-2">
+          <i class="bi bi-geo-alt-fill text-primary me-1"></i>
+          Currently at: <strong>{{ trip.current_node }}</strong>
+        </div>
+        {% endif %}
+        <div class="d-flex gap-2 text-muted small">
+          <span><i class="bi bi-people me-1"></i>{{ trip.max_passengers }} max</span>
+          <span><i class="bi bi-clock me-1"></i>{{ trip.created_at|date:"H:i" }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card text-center py-5">
+  <div class="text-muted">
+    <i class="bi bi-map hero-icon d-block mb-3"></i>
+    <h5>No active trips right now</h5>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

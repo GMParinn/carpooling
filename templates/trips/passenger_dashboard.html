@@ -1,0 +1,124 @@
+{% extends 'base.html' %}
+{% block title %}Passenger Dashboard — CarPoolNet{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="fw-bold mb-0">
+    <i class="bi bi-speedometer2 me-2 text-primary"></i>Passenger Dashboard
+  </h2>
+  <a href="{% url 'trips:create_request' %}" class="btn btn-primary">
+    <i class="bi bi-plus-lg me-2"></i>Request Ride
+  </a>
+</div>
+
+<!-- Stats Row -->
+<div class="row g-3 mb-4">
+  <div class="col-sm-4">
+    <div class="card stat-card">
+      <div class="value">{{ active_requests|length }}</div>
+      <div class="label">Active Requests</div>
+    </div>
+  </div>
+  <div class="col-sm-4">
+    <div class="card stat-card">
+      <div class="value text-success">${{ request.user.wallet_balance }}</div>
+      <div class="label">Wallet Balance</div>
+    </div>
+  </div>
+  <div class="col-sm-4">
+    <div class="card stat-card">
+      <div class="value">{{ past_requests|length }}</div>
+      <div class="label">Past Rides</div>
+    </div>
+  </div>
+</div>
+
+{% if active_requests %}
+<h5 class="fw-bold mb-3">Active Requests</h5>
+<div class="row g-3 mb-4">
+  {% for req in active_requests %}
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start mb-3">
+          <div>
+            <h6 class="fw-bold mb-0">{{ req.pickup_node }} → {{ req.dropoff_node }}</h6>
+            <small class="text-muted">Submitted {{ req.created_at|timesince }} ago</small>
+          </div>
+          <span class="badge
+            {% if req.status == 'pending' %}badge-pending
+            {% elif req.status == 'offered' %}badge-offered
+            {% elif req.status == 'confirmed' %}badge-active
+            {% else %}bg-secondary{% endif %}">
+            {{ req.get_status_display }}
+          </span>
+        </div>
+
+        {% if req.status == 'offered' %}
+        <div class="alert alert-info py-2 mb-3">
+          <i class="bi bi-bell-fill me-1"></i>
+          <strong>{{ req.offers.count }} driver offer(s)</strong> waiting for your confirmation!
+        </div>
+        {% elif req.status == 'confirmed' %}
+        <div class="alert alert-success py-2 mb-3">
+          <i class="bi bi-check-circle me-1"></i>
+          Confirmed with <strong>{{ req.confirmed_trip.driver.get_full_name|default:req.confirmed_trip.driver.username }}</strong>
+          · Fare: <strong>${{ req.fare }}</strong>
+        </div>
+        {% elif req.status == 'pending' %}
+        <div class="text-muted small mb-3">
+          <i class="bi bi-hourglass-split me-1"></i>Waiting for driver offers...
+        </div>
+        {% endif %}
+
+        <div class="d-flex gap-2">
+          <a href="{% url 'trips:request_detail' req.id %}" class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-eye me-1"></i>View Offers
+          </a>
+          {% if req.status in 'pending,offered' %}
+          <form method="post" action="{% url 'trips:cancel_request' req.id %}"
+                onsubmit="return confirm('Cancel this request?')">
+            {% csrf_token %}
+            <button class="btn btn-outline-danger btn-sm">
+              <i class="bi bi-x me-1"></i>Cancel
+            </button>
+          </form>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card text-center py-5 mb-4">
+  <div class="text-muted">
+    <i class="bi bi-geo-alt hero-icon d-block mb-3"></i>
+    <h5>No active requests</h5>
+    <p>Request a carpool ride to get started.</p>
+    <a href="{% url 'trips:create_request' %}" class="btn btn-primary">
+      <i class="bi bi-plus me-1"></i>Request Ride
+    </a>
+  </div>
+</div>
+{% endif %}
+
+{% if past_requests %}
+<h5 class="fw-bold mb-3">Ride History</h5>
+<div class="card">
+  <table class="table table-hover mb-0">
+    <thead><tr><th>Route</th><th>Status</th><th>Fare</th><th>Date</th></tr></thead>
+    <tbody>
+      {% for req in past_requests %}
+      <tr>
+        <td><strong>{{ req.pickup_node }}</strong> → <strong>{{ req.dropoff_node }}</strong></td>
+        <td><span class="badge badge-{{ req.status }}">{{ req.get_status_display }}</span></td>
+        <td>{% if req.fare %}<span class="text-success fw-semibold">${{ req.fare }}</span>{% else %}—{% endif %}</td>
+        <td class="text-muted small">{{ req.created_at|date:"M d, Y" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}

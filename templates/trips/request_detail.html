@@ -1,0 +1,203 @@
+{% extends 'base.html' %}
+{% block title %}Request #{{ request.id }} — CarPoolNet{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h2 class="fw-bold mb-0">
+      <i class="bi bi-geo-alt me-2 text-primary"></i>
+      {{ request.pickup_node }} → {{ request.dropoff_node }}
+    </h2>
+    <small class="text-muted">Request #{{ request.id }} · {{ request.created_at|date:"M d, Y H:i" }}</small>
+  </div>
+  <span class="badge fs-6 px-3 py-2
+    {% if request.status == 'pending' %}bg-warning text-dark
+    {% elif request.status == 'offered' %}bg-purple
+    {% elif request.status == 'confirmed' %}bg-success
+    {% elif request.status == 'completed' %}bg-primary
+    {% else %}bg-secondary{% endif %}"
+    style="{% if request.status == 'offered' %}background:#7c3aed{% endif %}">
+    {{ request.get_status_display }}
+  </span>
+</div>
+
+<!-- Status Banner -->
+{% if request.status == 'pending' %}
+<div class="alert alert-info">
+  <i class="bi bi-hourglass-split me-2"></i>
+  Your request is live. Nearby drivers will review and send you offers.
+  This page refreshes automatically.
+</div>
+{% elif request.status == 'offered' %}
+<div class="alert alert-warning">
+  <i class="bi bi-bell-fill me-2"></i>
+  <strong>{{ offers|length }} driver offer(s) available!</strong> Review and confirm one below.
+</div>
+{% elif request.status == 'confirmed' %}
+<div class="alert alert-success">
+  <i class="bi bi-check-circle-fill me-2"></i>
+  Ride confirmed with
+  <strong>{{ request.confirmed_trip.driver.get_full_name|default:request.confirmed_trip.driver.username }}</strong>.
+  Fare of <strong>${{ request.fare }}</strong> will be deducted from your wallet when the trip completes.
+</div>
+{% elif request.status == 'completed' %}
+<div class="alert alert-primary">
+  <i class="bi bi-flag-fill me-2"></i>
+  Ride completed! ${{ request.fare }} was charged from your wallet.
+</div>
+{% elif request.status == 'cancelled' %}
+<div class="alert alert-secondary">
+  <i class="bi bi-x-circle me-2"></i>This request was cancelled.
+</div>
+{% endif %}
+
+<div class="row g-4">
+  <div class="col-md-4">
+    <!-- Request Info Card -->
+    <div class="card mb-3">
+      <div class="card-header fw-semibold"><i class="bi bi-info-circle me-2"></i>Request Details</div>
+      <div class="card-body">
+        <div class="mb-2">
+          <span class="text-muted small">Pickup</span>
+          <div class="fw-bold"><i class="bi bi-geo-alt-fill text-success me-1"></i>{{ request.pickup_node }}</div>
+        </div>
+        <div class="mb-3">
+          <span class="text-muted small">Dropoff</span>
+          <div class="fw-bold"><i class="bi bi-flag-fill text-danger me-1"></i>{{ request.dropoff_node }}</div>
+        </div>
+        {% if request.fare %}
+        <div class="mb-2">
+          <span class="text-muted small">Agreed Fare</span>
+          <div class="fare-badge">${{ request.fare }}</div>
+        </div>
+        {% endif %}
+        <div class="mb-2">
+          <span class="text-muted small">Wallet Balance</span>
+          <div class="fw-semibold text-success">${{ user.wallet_balance }}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    {% if request.status in 'pending,offered' %}
+    <div class="card">
+      <div class="card-body">
+        <form method="post" action="{% url 'trips:cancel_request' request.id %}"
+              onsubmit="return confirm('Cancel this request?')">
+          {% csrf_token %}
+          <button class="btn btn-outline-danger w-100 btn-sm">
+            <i class="bi bi-x-circle me-1"></i>Cancel Request
+          </button>
+        </form>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="col-md-8">
+    <!-- Driver Offers -->
+    <h5 class="fw-bold mb-3">
+      <i class="bi bi-truck me-2 text-primary"></i>Driver Offers
+      {% if offers %}<span class="badge bg-primary">{{ offers|length }}</span>{% endif %}
+    </h5>
+
+    {% if offers %}
+    <div class="row g-3">
+      {% for offer in offers %}
+      <div class="col-12">
+        <div class="card border-primary-subtle">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start mb-3">
+              <div>
+                <h6 class="fw-bold mb-0">
+                  <i class="bi bi-person-circle me-2 text-primary"></i>
+                  {{ offer.trip.driver.get_full_name|default:offer.trip.driver.username }}
+                </h6>
+                <small class="text-muted">
+                  Trip: {{ offer.trip.start_node }} → {{ offer.trip.end_node }}
+                  · Status: <span class="badge badge-{{ offer.trip.status }}">{{ offer.trip.get_status_display }}</span>
+                </small>
+              </div>
+              <div class="text-end">
+                <div class="fare-badge">${{ offer.fare }}</div>
+                <div class="text-muted small">Total Fare</div>
+              </div>
+            </div>
+
+            <div class="row g-2 mb-3">
+              <div class="col-6">
+                <div class="bg-light rounded p-2 text-center">
+                  <div class="fw-bold {% if offer.detour_nodes == 0 %}text-success{% elif offer.detour_nodes <= 2 %}text-warning{% else %}text-muted{% endif %}">
+                    {% if offer.detour_nodes == 0 %}
+                      <i class="bi bi-check-circle-fill me-1"></i>None
+                    {% else %}
+                      +{{ offer.detour_nodes }} node{{ offer.detour_nodes|pluralize }}
+                    {% endif %}
+                  </div>
+                  <div class="text-muted small">Driver Detour</div>
+                </div>
+              </div>
+              <div class="col-6">
+                <div class="bg-light rounded p-2 text-center">
+                  <div class="fw-bold text-success">${{ offer.fare }}</div>
+                  <div class="text-muted small">You Pay</div>
+                </div>
+              </div>
+            </div>
+
+            {% if request.status in 'pending,offered' %}
+              {% if user.wallet_balance >= offer.fare %}
+              <form method="post" action="{% url 'trips:confirm_offer' offer.id %}">
+                {% csrf_token %}
+                <button class="btn btn-success w-100">
+                  <i class="bi bi-check-lg me-1"></i>
+                  Confirm This Offer — ${{ offer.fare }}
+                </button>
+              </form>
+              {% else %}
+              <div class="alert alert-warning py-2 mb-2 small">
+                <i class="bi bi-exclamation-triangle me-1"></i>
+                Insufficient balance. You need ${{ offer.fare }} but have ${{ user.wallet_balance }}.
+                <a href="{% url 'accounts:topup' %}" class="ms-1">Top up →</a>
+              </div>
+              <button class="btn btn-secondary w-100" disabled>Insufficient Balance</button>
+              {% endif %}
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    {% elif request.status == 'pending' %}
+    <div class="card text-center py-5">
+      <div class="text-muted">
+        <i class="bi bi-hourglass-split hero-icon d-block mb-2"></i>
+        <h6>Waiting for driver offers...</h6>
+        <p class="small mb-0">This page refreshes every 15 seconds.</p>
+      </div>
+    </div>
+    {% else %}
+    <div class="card text-center py-4">
+      <div class="text-muted">No pending offers.</div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="mt-3">
+  <a href="{% url 'trips:passenger_dashboard' %}" class="btn btn-link">← Back to Dashboard</a>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if request.status in 'pending,offered' %}
+<script>
+let secs = 15;
+const timer = setInterval(() => {
+  secs--;
+  if (secs <= 0) { clearInterval(timer); location.reload(); }
+}, 1000);
+</script>
+{% endif %}
+{% endblock %}
