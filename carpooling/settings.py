@@ -54,7 +54,12 @@ TEMPLATES = [
 WSGI_APPLICATION = 'carpooling.wsgi.application'
 
 # SQLite for dev, PostgreSQL when POSTGRES_DB env var is set
-if os.environ.get('POSTGRES_DB'):
+import dj_database_url
+
+if os.environ.get('DATABASE_URL'):
+    DATABASES = {'default': dj_database_url.config(conn_max_age=600)}
+    
+elif os.environ.get('POSTGRES_DB'):
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql',
